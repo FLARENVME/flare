@@ -1,0 +1,24 @@
+name: pine-check
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  pine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Local static checks (no code leaves the runner)
+        shell: bash
+        run: |
+          shopt -s globstar nullglob
+          files=(**/*.pine)
+          [ ${#files[@]} -gt 0 ] || { echo "no .pine files"; exit 0; }
+          python tools/static_check.py "${files[@]}" | tee check1.txt
+          python tools/static_check2.py "${files[@]}" | tee check2.txt
+          fail=0
+          grep -E "paren \{'\(': [^0]|'\[': [^0]" check1.txt && { echo "::error::Unbalanced brackets"; fail=1; }
+          grep -E "TOO LONG" check2.txt && echo "::warning::shorttitle > 10 chars in some files" || true
+          exit $fail
